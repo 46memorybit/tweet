@@ -7,78 +7,59 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
-  body {
-    font-family: sans-serif;
-    margin: 20px;
-  }
-  .controls {
-    display: flex;
-    gap: 20px;
-    flex-wrap: wrap;
-    margin-bottom: 20px;
-  }
-  .group {
-    border: 1px solid #ccc;
-    padding: 10px;
-    min-width: 220px;
-  }
+body { font-family: sans-serif; margin: 20px; }
+.controls { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 20px; }
+.group { border: 1px solid #ccc; padding: 10px; min-width: 220px; }
 </style>
 </head>
 <body>
 
-<h2>Tweet グラフ</h2>
+<h2>Tweet Logs 時系列グラフ</h2>
 
 <div id="controls" class="controls"></div>
-
 <canvas id="chart" height="140"></canvas>
 
 <script>
-/* =====================
-   設定
-===================== */
+/* ========= 設定 ========= */
 const OWNER = '46memorybit';
 const REPO  = 'tweet';
 const BASE_PATH = 'logs';
 
-/* =====================
-   GitHub API
-===================== */
+/* ========= GitHub API ========= */
 async function fetchJSON(url) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(res.status + ' ' + url);
   return res.json();
 }
 
-/* =====================
-   CSV → 時系列（BOM対応）
-===================== */
+/* ========= CSV → 時系列（完全耐性版） ========= */
 function csvToTimeSeries(csvText) {
-  // ★ BOM除去（超重要）
-  csvText = csvText.replace(/^\uFEFF/, '');
-
-  const lines = csvText.trim().split('\n');
-  const headers = lines[0].split(',');
+  csvText = csvText.replace(/^\uFEFF/, ''); // BOM除去
+  const lines = csvText.split(/\r?\n/).filter(l => l.trim() !== '');
+  const headers = lines[0].split(',').map(h => h.trim());
 
   const labels = [];
   const values = [];
 
   for (let i = 1; i < lines.length; i++) {
-    const cols = lines[i].split(',');
-    const date = cols[0].trim();
+    const cols = lines[i].split(',').map(c => c.trim());
+    const date = cols[0];
 
     for (let h = 1; h < headers.length; h++) {
+      if (cols[h] === undefined || cols[h] === '') continue;
+
       const v = Number(cols[h]);
+      if (Number.isNaN(v)) continue;
+
       labels.push(`${date}/${headers[h]}`);
-      values.push(isNaN(v) ? 0 : v);
+      values.push(v);
     }
   }
 
   return { labels, values };
 }
 
-/* =====================
-   CSV 全取得
-===================== */
+/* ========= CSV 全取得 ========= */
 async function loadAllCSVs() {
   const folders = await fetchJSON(
     `https://api.github.com/repos/${OWNER}/${REPO}/contents/${BASE_PATH}`
@@ -93,6 +74,8 @@ async function loadAllCSVs() {
       const csvText = await fetch(file.download_url).then(r => r.text());
       const ts = csvToTimeSeries(csvText);
 
+      console.log(file.name, ts.values.slice(0, 5)); // ★確認用
+
       datasets.push({
         folder: folder.name,
         file: file.name,
@@ -105,48 +88,26 @@ async function loadAllCSVs() {
   return datasets;
 }
 
-/* =====================
-   Chart.js 初期化
-===================== */
-const chart = new Chart(
-  document.getElementById('chart'),
-  {
-    type: 'line',
-    data: {
-      labels: [],
-      datasets: []
-    },
-    options: {
-      responsive: true,
-      interaction: { mode: 'nearest', intersect: false },
-      scales: {
-        x: {
-          ticks: {
-            autoSkip: true,
-            maxRotation: 90,
-            minRotation: 90
-          }
-        },
-        y: {
-          beginAtZero: true
-        }
-      }
+/* ========= Chart ========= */
+const chart = new Chart(document.getElementById('chart'), {
+  type: 'line',
+  data: { labels: [], datasets: [] },
+  options: {
+    responsive: true,
+    scales: {
+      x: { ticks: { autoSkip: true, maxRotation: 90, minRotation: 90 }},
+      y: { beginAtZero: true }
     }
   }
-);
+});
 
-/* =====================
-   チェックボックス生成
-===================== */
+/* ========= チェックボックス ========= */
 function buildControls(datasets) {
   const container = document.getElementById('controls');
   container.innerHTML = '';
 
   const byFolder = {};
-  datasets.forEach(d => {
-    byFolder[d.folder] ??= [];
-    byFolder[d.folder].push(d);
-  });
+  datasets.forEach(d => (byFolder[d.folder] ??= []).push(d));
 
   Object.entries(byFolder).forEach(([folder, files]) => {
     const div = document.createElement('div');
@@ -155,20 +116,14 @@ function buildControls(datasets) {
     const folderCb = document.createElement('input');
     folderCb.type = 'checkbox';
     folderCb.checked = true;
-
-    const title = document.createElement('label');
-    title.textContent = ' ' + folder;
-
-    div.append(folderCb, title, document.createElement('br'));
+    div.append(folderCb, ' ' + folder, document.createElement('br'));
 
     files.forEach(f => {
       const cb = document.createElement('input');
       cb.type = 'checkbox';
       cb.checked = true;
       cb.onchange = updateChart;
-
       f._cb = cb;
-
       div.append(cb, ' ' + f.file, document.createElement('br'));
     });
 
@@ -181,20 +136,14 @@ function buildControls(datasets) {
   });
 }
 
-/* =====================
-   グラフ更新
-===================== */
+/* ========= グラフ更新 ========= */
 function updateChart() {
   chart.data.datasets = [];
   chart.data.labels = [];
 
   const active = datasets.filter(d => d._cb.checked);
-  if (active.length === 0) {
-    chart.update();
-    return;
-  }
+  if (active.length === 0) return chart.update();
 
-  // X軸は最初の有効データに統一
   chart.data.labels = active[0].labels;
 
   active.forEach(d => {
@@ -208,22 +157,15 @@ function updateChart() {
   chart.update();
 }
 
-/* =====================
-   起動
-===================== */
+/* ========= 起動 ========= */
 let datasets = [];
-
 (async () => {
-  try {
-    datasets = await loadAllCSVs();
-    buildControls(datasets);
-    updateChart();
-  } catch (e) {
-    console.error(e);
-    alert('データ取得に失敗しました。Consoleを確認してください。');
-  }
+  datasets = await loadAllCSVs();
+  buildControls(datasets);
+  updateChart();
 })();
 </script>
 
 </body>
 </html>
+
