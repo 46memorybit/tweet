@@ -1,169 +1,170 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <title>Tweet Logs Viewer</title>
-
-  <!-- Chart.js -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <!-- PapaParse -->
-  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-
-  <style>
-    body {
-      font-family: sans-serif;
-      margin: 20px;
-    }
-    .group {
-      margin-bottom: 10px;
-    }
-    .file {
-      margin-left: 20px;
-    }
-  </style>
+<meta charset="UTF-8">
+<title>Tweet Log Viewer</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  body { font-family: sans-serif; }
+  .group { margin-bottom: 12px; }
+  .files { margin-left: 20px; }
+  .filter { margin-bottom: 16px; }
+</style>
 </head>
 <body>
 
-<h2>Tweetログ グラフ表示</h2>
+<h2>ツイート時間帯グラフ（1時間単位）</h2>
+
+<div class="filter">
+  期間指定：
+  <input type="date" id="startDate">
+  〜
+  <input type="date" id="endDate">
+  <button onclick="updateChart()">反映</button>
+</div>
 
 <div id="controls"></div>
-
-<hr>
 
 <canvas id="chart" height="120"></canvas>
 
 <script>
-/* =========================
-   設定（★ここだけ編集）
-========================= */
-const DATASETS = {
-  "櫻坂46 小島凪紗": [
-    "tweet/logs/櫻坂46メンバー名/#小島凪紗.csv",
-  ],
-  "日向坂46 金村美玖": [
-    "tweet/logs/日向坂46メンバー名/#金村美玖.csv"
-  ]
+/* =============================
+   フォルダ・CSV 定義
+   ============================= */
+const DATA_STRUCTURE = {
+  "櫻坂46": {
+    folder: "tweet/logs/櫻坂46メンバー名/",
+    files: ["#小島凪紗.csv", "#藤吉夏鈴.csv"]
+  },
+  "日向坂46": {
+    folder: "tweet/logs/日向坂46メンバー名/",
+    files: ["#金村美玖.csv"]
+  }
 };
 
-/* =========================
-   CSV 読み込み
-========================= */
-async function loadCsv(path) {
-  const text = await fetch(path).then(r => r.text());
-  const parsed = Papa.parse(text, { header: true });
+const TIME_LABELS = [
+  "0~1","1~2","2~3","3~4","4~5","5~6","6~7","7~8",
+  "8~9","9~10","10~11","11~12","12~13","13~14",
+  "14~15","15~16","16~17","17~18","18~19","19~20",
+  "20~21","21~22","22~23","23~24"
+];
 
-  return parsed.data.map(row => {
-    let sum = 0;
-    Object.keys(row).forEach(k => {
-      if (k !== "YYYY/MM/DD") sum += Number(row[k] || 0);
-    });
-    return {
-      date: row["YYYY/MM/DD"],
-      value: sum
-    };
+let chart;
+
+/* =============================
+   CSV 読み込み（期間フィルタ対応）
+   ============================= */
+async function loadCSV(path, start, end) {
+  const text = await fetch(path).then(r => r.text());
+  const lines = text.trim().split("\n");
+  const headers = lines[0].split(",");
+  const sum = Array(24).fill(0);
+
+  lines.slice(1).forEach(line => {
+    const cols = line.split(",");
+    const date = cols[0];
+
+    if (start && date < start) return;
+    if (end && date > end) return;
+
+    for (let i = 1; i <= 24; i++) {
+      sum[i - 1] += Number(cols[i] || 0);
+    }
   });
+
+  return sum;
 }
 
-/* =========================
-   Chart 初期化
-========================= */
-const chart = new Chart(
-  document.getElementById("chart"),
-  {
+/* =============================
+   チェックボックス生成
+   ============================= */
+function buildControls() {
+  const root = document.getElementById("controls");
+
+  for (const groupName in DATA_STRUCTURE) {
+    const g = DATA_STRUCTURE[groupName];
+
+    const div = document.createElement("div");
+    div.className = "group";
+
+    const gCheck = document.createElement("input");
+    gCheck.type = "checkbox";
+    gCheck.checked = true;
+
+    const gLabel = document.createElement("label");
+    gLabel.append(gCheck, " ", groupName);
+
+    const filesDiv = document.createElement("div");
+    filesDiv.className = "files";
+
+    g.files.forEach(file => {
+      const fCheck = document.createElement("input");
+      fCheck.type = "checkbox";
+      fCheck.checked = true;
+      fCheck.dataset.path = g.folder + file;
+      fCheck.addEventListener("change", updateChart);
+
+      const fLabel = document.createElement("label");
+      fLabel.append(fCheck, " ", file);
+
+      filesDiv.appendChild(fLabel);
+      filesDiv.appendChild(document.createElement("br"));
+    });
+
+    gCheck.addEventListener("change", () => {
+      filesDiv.querySelectorAll("input").forEach(cb => {
+        cb.checked = gCheck.checked;
+      });
+      updateChart();
+    });
+
+    div.append(gLabel, filesDiv);
+    root.appendChild(div);
+  }
+}
+
+/* =============================
+   グラフ更新
+   ============================= */
+async function updateChart() {
+  const start = document.getElementById("startDate").value;
+  const end = document.getElementById("endDate").value;
+
+  const datasets = [];
+  const checks = document.querySelectorAll(".files input:checked");
+
+  for (const cb of checks) {
+    const data = await loadCSV(cb.dataset.path, start, end);
+    datasets.push({
+      label: cb.dataset.path.split("/").pop(),
+      data,
+      tension: 0.2
+    });
+  }
+
+  if (chart) chart.destroy();
+
+  chart = new Chart(document.getElementById("chart"), {
     type: "line",
     data: {
-      labels: [],
-      datasets: []
+      labels: TIME_LABELS,
+      datasets
     },
     options: {
       responsive: true,
-      interaction: { mode: "index" },
-      plugins: {
-        legend: { display: true }
+      interaction: { mode: "nearest", intersect: false },
+      scales: {
+        y: { beginAtZero: true }
       }
     }
-  }
-);
-
-/* =========================
-   チェックボックス生成
-========================= */
-const controls = document.getElementById("controls");
-const datasetMap = {};
-
-Object.entries(DATASETS).forEach(([groupName, files]) => {
-  const groupDiv = document.createElement("div");
-  groupDiv.className = "group";
-
-  const groupCb = document.createElement("input");
-  groupCb.type = "checkbox";
-  groupCb.checked = true;
-
-  const groupLabel = document.createElement("label");
-  groupLabel.textContent = " " + groupName;
-
-  groupDiv.append(groupCb, groupLabel);
-
-  files.forEach(path => {
-    const fileDiv = document.createElement("div");
-    fileDiv.className = "file";
-
-    const cb = document.createElement("input");
-    cb.type = "checkbox";
-    cb.checked = true;
-
-    const name = path.split("/").pop().replace(".csv", "");
-    const label = document.createElement("label");
-    label.textContent = " " + name;
-
-    cb.onchange = () => {
-      datasetMap[path].hidden = !cb.checked;
-      chart.update();
-    };
-
-    fileDiv.append(cb, label);
-    groupDiv.append(fileDiv);
-
-    datasetMap[path] = { checkbox: cb };
   });
+}
 
-  groupCb.onchange = () => {
-    files.forEach(path => {
-      const d = datasetMap[path];
-      d.checkbox.checked = groupCb.checked;
-      d.dataset.hidden = !groupCb.checked;
-    });
-    chart.update();
-  };
-
-  controls.append(groupDiv);
-});
-
-/* =========================
-   CSV読み込み → グラフ反映
-========================= */
-(async () => {
-  for (const files of Object.values(DATASETS)) {
-    for (const path of files) {
-      const rows = await loadCsv(path);
-
-      if (chart.data.labels.length === 0) {
-        chart.data.labels = rows.map(r => r.date);
-      }
-
-      const dataset = {
-        label: path.split("/").pop().replace(".csv", ""),
-        data: rows.map(r => r.value),
-        borderWidth: 2,
-        hidden: false
-      };
-
-      chart.data.datasets.push(dataset);
-      datasetMap[path].dataset = dataset;
-    }
-  }
-  chart.update();
-})();
+/* =============================
+   初期化
+   ============================= */
+buildControls();
+updateChart();
 </script>
 
 </body>
