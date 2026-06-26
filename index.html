@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>X共有アプリ</title>
+
+<style>
+body{
+    font-family:sans-serif;
+    max-width:500px;
+    margin:40px auto;
+    padding:20px;
+}
+
+textarea{
+    width:100%;
+    height:120px;
+    font-size:16px;
+}
+
+input[type=file]{
+    margin:15px 0;
+}
+
+button{
+    width:100%;
+    padding:15px;
+    font-size:18px;
+}
+</style>
+</head>
+<body>
+
+<h2>Xへ共有</h2>
+
+<textarea id="text" placeholder="投稿するテキスト"></textarea>
+
+<input id="image" type="file" accept="image/*">
+
+<button id="share">
+Xへ共有
+</button>
+
+<p id="status"></p>
+
+<script>
+
+const button=document.getElementById("share");
+
+button.onclick=async()=>{
+
+    const status=document.getElementById("status");
+    status.textContent="";
+
+    if(!navigator.share){
+        status.textContent="このブラウザはWeb Share APIに対応していません";
+        return;
+    }
+
+    const text=document.getElementById("text").value;
+
+    const input=document.getElementById("image");
+
+    const files=[];
+
+    if(input.files.length>0){
+
+        files.push(input.files[0]);
+
+        if(navigator.canShare && !navigator.canShare({files})){
+            status.textContent="画像共有に対応していません";
+            return;
+        }
+
+    }
+
+    try{
+
+        await navigator.share({
+            text:text,
+            files:files
+        });
+
+        status.textContent="共有画面を開きました";
+
+    }catch(e){
+
+        status.textContent="キャンセルされました";
+
+    }
+
+}
+
+</script>
+
+</body>
+</html>
