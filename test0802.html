@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Web Share</title>
+
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-family: sans-serif;
+      background: #f5f5f5;
+    }
+
+    button {
+      padding: 16px 32px;
+      font-size: 18px;
+      border: none;
+      border-radius: 10px;
+      background: #000;
+      color: #fff;
+      cursor: pointer;
+    }
+
+    button:active {
+      transform: scale(0.97);
+    }
+
+    #status {
+      position: fixed;
+      bottom: 20px;
+      left: 0;
+      right: 0;
+      text-align: center;
+      font-size: 14px;
+    }
+  </style>
+
+</head>
+
+<body>
+
+  <button id="shareButton">
+    シェアする
+  </button>
+
+  <div id="status"></div>
+
+  <script>
+    const TEXT = "#櫻坂46こち星";
+
+    const IMAGE_URL =
+      "https://www.allnightnippon.com/wp/assets/uploads/2026/08/0802_2.jpg";
+
+    const shareButton = document.getElementById("shareButton");
+    const status = document.getElementById("status");
+
+    shareButton.addEventListener("click", async () => {
+
+      try {
+
+        // Web Share API 対応確認
+        if (!navigator.share) {
+          throw new Error(
+            "このブラウザはWeb Share APIに対応していません。"
+          );
+        }
+
+        status.textContent = "画像を取得しています...";
+
+        // 画像を取得
+        const response = await fetch(IMAGE_URL);
+
+        if (!response.ok) {
+          throw new Error(
+            "画像の取得に失敗しました: HTTP " + response.status
+          );
+        }
+
+        const blob = await response.blob();
+
+        // Blob → File
+        const file = new File(
+          [blob],
+          "0802_2.jpg",
+          {
+            type: blob.type || "image/jpeg"
+          }
+        );
+
+        // 共有データ
+        const shareData = {
+          text: TEXT,
+          files: [file]
+        };
+
+        // ファイル共有に対応しているか確認
+        if (
+          navigator.canShare &&
+          !navigator.canShare({ files: [file] })
+        ) {
+          throw new Error(
+            "この端末・ブラウザでは画像ファイルの共有に対応していません。"
+          );
+        }
+
+        status.textContent = "共有画面を開いています...";
+
+        // Web Share API
+        await navigator.share(shareData);
+
+        status.textContent = "共有しました！";
+
+      } catch (error) {
+
+        // ユーザーが共有画面を閉じた場合
+        if (error.name === "AbortError") {
+          status.textContent = "共有をキャンセルしました。";
+          return;
+        }
+
+        console.error(error);
+
+        status.textContent =
+          "共有に失敗しました: " + error.message;
+      }
+
+    });
+  </script>
+
+</body>
+</html>
