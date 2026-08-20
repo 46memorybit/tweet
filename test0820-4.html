@@ -1,4 +1,3 @@
-```html
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -8,82 +7,90 @@
 <title>100×100 ブロック文字 Generator</title>
 
 <style>
-    * {
-        box-sizing: border-box;
-    }
 
-    body {
-        margin: 0;
-        padding: 30px;
-        font-family: sans-serif;
-        background: #eeeeee;
-        color: #222;
-    }
+* {
+    box-sizing: border-box;
+}
 
-    .container {
-        max-width: 1000px;
-        margin: 0 auto;
-    }
+body {
+    margin: 0;
+    padding: 30px;
+    font-family: sans-serif;
+    background: #eeeeee;
+    color: #222;
+}
 
-    h1 {
-        font-size: 24px;
-        margin-bottom: 20px;
-    }
+.container {
+    max-width: 1000px;
+    margin: 0 auto;
+}
 
-    textarea {
-        width: 100%;
-        height: 120px;
-        padding: 12px;
-        font-size: 20px;
-        resize: vertical;
-        border: 1px solid #ccc;
-        border-radius: 6px;
-    }
+h1 {
+    font-size: 24px;
+    margin-bottom: 20px;
+}
 
-    button {
-        margin-top: 12px;
-        margin-right: 6px;
-        padding: 10px 20px;
-        border: none;
-        border-radius: 6px;
-        background: #323639;
-        color: #fff;
-        font-size: 16px;
-        cursor: pointer;
-    }
+textarea {
+    width: 100%;
+    height: 120px;
+    padding: 12px;
+    font-size: 20px;
+    resize: vertical;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+}
 
-    button:hover {
-        opacity: 0.85;
-    }
+button {
+    margin-top: 12px;
+    margin-right: 6px;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 6px;
+    background: #323639;
+    color: #fff;
+    font-size: 16px;
+    cursor: pointer;
+}
 
-    #preview {
-        margin-top: 30px;
-        padding: 30px;
-        overflow-x: auto;
+button:hover {
+    opacity: 0.85;
+}
 
-        /* 透過部分確認用 */
-        background:
-            linear-gradient(45deg, #ddd 25%, transparent 25%),
-            linear-gradient(-45deg, #ddd 25%, transparent 25%),
-            linear-gradient(45deg, transparent 75%, #ddd 75%),
-            linear-gradient(-45deg, transparent 75%, #ddd 75%);
 
-        background-size: 20px 20px;
+/*
+ * プレビュー
+ *
+ * 透過部分が分かるように
+ * チェッカーボードを表示
+ */
+#preview {
+    margin-top: 30px;
+    padding: 30px;
+    overflow-x: auto;
 
-        background-position:
-            0 0,
-            0 10px,
-            10px -10px,
-            -10px 0;
+    background:
+        linear-gradient(45deg, #ddd 25%, transparent 25%),
+        linear-gradient(-45deg, #ddd 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #ddd 75%),
+        linear-gradient(-45deg, transparent 75%, #ddd 75%);
 
-        border-radius: 8px;
-    }
+    background-size: 20px 20px;
 
-    #preview svg {
-        display: block;
-        width: 100%;
-        height: auto;
-    }
+    background-position:
+        0 0,
+        0 10px,
+        10px -10px,
+        -10px 0;
+
+    border-radius: 8px;
+}
+
+#preview svg {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
 </style>
 
 </head>
@@ -120,9 +127,11 @@
 
 <script>
 
+
 /* =========================================
    設定
 ========================================= */
+
 
 /*
  * 1文字を100×100に分割
@@ -138,8 +147,6 @@ const GRID_SIZE = 100;
  *
  * 100px × 100px
  *
- * したがって
- *
  * 1ブロック = 1px × 1px
  */
 const FONT_SIZE = 100;
@@ -152,9 +159,9 @@ const LETTER_SPACING = 10;
 
 
 /*
- * 使用する3色
+ * 文字部分に使用する色
  */
-const COLORS = [
+const TEXT_COLORS = [
     "#323639",
     "#cfd9de",
     "#ffffff"
@@ -162,9 +169,18 @@ const COLORS = [
 
 
 /*
+ * 背景を黒にする確率
+ *
+ * 0.5 = 50%
+ */
+const BACKGROUND_BLACK_PROBABILITY = 0.5;
+
+
+/*
  * 現在のSVG
  */
 let currentSVG = null;
+
 
 
 /* =========================================
@@ -191,7 +207,7 @@ function createCharacter(char, x, y) {
 
 
     /*
-     * 背景は透明
+     * 完全透明
      */
     ctx.clearRect(
         0,
@@ -203,8 +219,6 @@ function createCharacter(char, x, y) {
 
     /*
      * 文字描画
-     *
-     * 100×100の領域いっぱいを使用
      */
     ctx.font =
         `bold ${FONT_SIZE}px sans-serif`;
@@ -227,7 +241,7 @@ function createCharacter(char, x, y) {
 
 
     /*
-     * Canvasのピクセル情報を取得
+     * Canvasのピクセル情報
      */
     const imageData =
         ctx.getImageData(
@@ -243,7 +257,7 @@ function createCharacter(char, x, y) {
 
 
     /*
-     * SVGのブロック
+     * SVGブロック
      */
     let blocks = "";
 
@@ -266,12 +280,9 @@ function createCharacter(char, x, y) {
         ) {
 
             /*
-             * このブロックの中央ピクセル
-             *
              * 1ブロック = 1px
              */
             const px = col;
-
             const py = row;
 
 
@@ -283,32 +294,30 @@ function createCharacter(char, x, y) {
 
 
             /*
-             * Alpha値
+             * 文字部分かどうか
              */
             const alpha =
                 data[index + 3];
 
 
-            /*
-             * 文字部分の場合だけ着色
-             */
+            /* =================================
+               文字部分
+            ================================= */
+
             if (alpha > 30) {
 
                 /*
-                 * 3色からランダム選択
+                 * 文字部分は3色からランダム
                  */
                 const color =
-                    COLORS[
+                    TEXT_COLORS[
                         Math.floor(
                             Math.random() *
-                            COLORS.length
+                            TEXT_COLORS.length
                         )
                     ];
 
 
-                /*
-                 * 1×1pxのブロック
-                 */
                 blocks +=
                     `<rect
                         x="${x + col}"
@@ -317,6 +326,42 @@ function createCharacter(char, x, y) {
                         height="1"
                         fill="${color}"
                     />`;
+
+            }
+
+
+            /* =================================
+               背景部分
+            ================================= */
+
+            else {
+
+                /*
+                 * 50%の確率で黒
+                 *
+                 * Math.random() < 0.5
+                 */
+                if (
+                    Math.random() <
+                    BACKGROUND_BLACK_PROBABILITY
+                ) {
+
+                    blocks +=
+                        `<rect
+                            x="${x + col}"
+                            y="${y + row}"
+                            width="1"
+                            height="1"
+                            fill="#000000"
+                        />`;
+
+                }
+
+                /*
+                 * それ以外は何も描画しない
+                 *
+                 * → 完全透過
+                 */
             }
         }
     }
@@ -324,6 +369,7 @@ function createCharacter(char, x, y) {
 
     return blocks;
 }
+
 
 
 /* =========================================
@@ -376,7 +422,7 @@ function generateSVG() {
 
 
     /*
-     * すべての文字を処理
+     * 全文字を処理
      */
     chars.forEach(
         (char, index) => {
@@ -402,8 +448,8 @@ function generateSVG() {
     /*
      * 背景なしSVG
      *
-     * backgroundや背景rectを
-     * 一切入れないため完全透過
+     * 描画されなかった部分は
+     * 完全透過
      */
     currentSVG = `
 <svg
@@ -418,13 +464,14 @@ ${content}
 
 
     /*
-     * プレビュー
+     * プレビュー表示
      */
     document.getElementById(
         "preview"
     ).innerHTML =
         currentSVG;
 }
+
 
 
 /* =========================================
@@ -486,6 +533,7 @@ function downloadSVG() {
 }
 
 
+
 /* =========================================
    透過PNGダウンロード
 ========================================= */
@@ -519,7 +567,7 @@ function downloadPNG() {
 
 
     /*
-     * SVGのURL
+     * SVG URL
      */
     const svgURL =
         URL.createObjectURL(
@@ -528,7 +576,7 @@ function downloadPNG() {
 
 
     /*
-     * SVGを画像として読み込む
+     * Imageとして読み込む
      */
     const img =
         new Image();
@@ -560,9 +608,9 @@ function downloadPNG() {
 
 
             /*
-             * Canvasは初期状態が透明。
+             * 背景を描画しない
              *
-             * 背景を描画しない。
+             * → 完全透過
              */
             ctx.clearRect(
                 0,
@@ -573,7 +621,7 @@ function downloadPNG() {
 
 
             /*
-             * SVGをCanvasへ描画
+             * SVGを描画
              */
             ctx.drawImage(
                 img,
@@ -583,7 +631,7 @@ function downloadPNG() {
 
 
             /*
-             * PNG化
+             * PNGとして出力
              */
             canvas.toBlob(
                 function (blob) {
@@ -646,9 +694,6 @@ function downloadPNG() {
             );
 
 
-            /*
-             * SVG URL解放
-             */
             URL.revokeObjectURL(
                 svgURL
             );
@@ -669,14 +714,14 @@ function downloadPNG() {
 
 
     /*
-     * SVGを読み込む
+     * SVG読み込み
      */
     img.src =
         svgURL;
 }
 
+
 </script>
 
 </body>
 </html>
-```
