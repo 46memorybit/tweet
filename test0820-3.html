@@ -5,7 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>10×10 ブロック文字 Generator</title>
+<title>100×100 ブロック文字 Generator</title>
 
 <style>
     * {
@@ -21,7 +21,7 @@
     }
 
     .container {
-        max-width: 900px;
+        max-width: 1000px;
         margin: 0 auto;
     }
 
@@ -59,11 +59,9 @@
     #preview {
         margin-top: 30px;
         padding: 30px;
+        overflow-x: auto;
 
-        /*
-         * 透過部分が分かるように
-         * チェッカーボードを表示
-         */
+        /* 透過部分確認用 */
         background:
             linear-gradient(45deg, #ddd 25%, transparent 25%),
             linear-gradient(-45deg, #ddd 25%, transparent 25%),
@@ -71,6 +69,7 @@
             linear-gradient(-45deg, transparent 75%, #ddd 75%);
 
         background-size: 20px 20px;
+
         background-position:
             0 0,
             0 10px,
@@ -78,7 +77,6 @@
             -10px 0;
 
         border-radius: 8px;
-        overflow-x: auto;
     }
 
     #preview svg {
@@ -94,7 +92,7 @@
 
 <div class="container">
 
-    <h1>10×10 ブロック文字 Generator</h1>
+    <h1>100×100 ブロック文字 Generator</h1>
 
     <textarea
         id="textInput"
@@ -126,21 +124,26 @@
    設定
 ========================================= */
 
-const COLORS = [
-    "#323639",
-    "#cfd9de",
-    "#ffffff"
-];
+/*
+ * 1文字を100×100に分割
+ *
+ * 100 × 100
+ * = 10,000ブロック
+ */
+const GRID_SIZE = 100;
+
 
 /*
- * 1文字あたりのサイズ
+ * 1文字のサイズ
  *
- * 100 × 100 px
+ * 100px × 100px
  *
- * 10 × 10に分割するので
- * 1ブロック = 10 × 10 px
+ * したがって
+ *
+ * 1ブロック = 1px × 1px
  */
 const FONT_SIZE = 100;
+
 
 /*
  * 文字同士の間隔
@@ -148,97 +151,136 @@ const FONT_SIZE = 100;
 const LETTER_SPACING = 10;
 
 
-/* 現在生成されているSVG */
+/*
+ * 使用する3色
+ */
+const COLORS = [
+    "#323639",
+    "#cfd9de",
+    "#ffffff"
+];
+
+
+/*
+ * 現在のSVG
+ */
 let currentSVG = null;
 
 
 /* =========================================
-   1文字を10×10ブロックに変換
+   1文字を100×100ブロックに変換
 ========================================= */
 
-function createCharacter(char, x, y, fontSize) {
-
-    const cellSize = fontSize / 10;
+function createCharacter(char, x, y) {
 
     /*
-     * 文字の形を判定するためのCanvas
+     * 文字判定用Canvas
      */
-    const canvas = document.createElement("canvas");
+    const canvas =
+        document.createElement("canvas");
 
-    const ctx = canvas.getContext("2d");
+    const ctx =
+        canvas.getContext("2d");
 
-    canvas.width = fontSize;
-    canvas.height = fontSize;
+
+    canvas.width =
+        FONT_SIZE;
+
+    canvas.height =
+        FONT_SIZE;
+
 
     /*
-     * 完全透明にする
+     * 背景は透明
      */
     ctx.clearRect(
         0,
         0,
-        fontSize,
-        fontSize
+        FONT_SIZE,
+        FONT_SIZE
     );
 
+
     /*
-     * 太字フォント
+     * 文字描画
+     *
+     * 100×100の領域いっぱいを使用
      */
     ctx.font =
-        `bold ${fontSize}px sans-serif`;
+        `bold ${FONT_SIZE}px sans-serif`;
 
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
+    ctx.textAlign =
+        "center";
 
-    ctx.fillStyle = "#000000";
+    ctx.textBaseline =
+        "middle";
 
-    /*
-     * 文字を描画
-     */
+    ctx.fillStyle =
+        "#000000";
+
+
     ctx.fillText(
         char,
-        fontSize / 2,
-        fontSize / 2
+        FONT_SIZE / 2,
+        FONT_SIZE / 2
     );
 
+
     /*
-     * ピクセル情報を取得
+     * Canvasのピクセル情報を取得
      */
     const imageData =
         ctx.getImageData(
             0,
             0,
-            fontSize,
-            fontSize
+            FONT_SIZE,
+            FONT_SIZE
         );
 
-    const data = imageData.data;
 
+    const data =
+        imageData.data;
+
+
+    /*
+     * SVGのブロック
+     */
     let blocks = "";
 
 
     /*
-     * 10 × 10 = 100ブロック
+     * 100 × 100
+     *
+     * = 10,000ブロック
      */
-    for (let row = 0; row < 10; row++) {
+    for (
+        let row = 0;
+        row < GRID_SIZE;
+        row++
+    ) {
 
-        for (let col = 0; col < 10; col++) {
+        for (
+            let col = 0;
+            col < GRID_SIZE;
+            col++
+        ) {
 
             /*
-             * ブロック中央のピクセル
+             * このブロックの中央ピクセル
+             *
+             * 1ブロック = 1px
              */
-            const px = Math.floor(
-                (col + 0.5) * cellSize
-            );
+            const px = col;
 
-            const py = Math.floor(
-                (row + 0.5) * cellSize
-            );
+            const py = row;
+
 
             /*
              * RGBA配列の位置
              */
             const index =
-                (py * fontSize + px) * 4;
+                (py * FONT_SIZE + px) * 4;
+
 
             /*
              * Alpha値
@@ -248,7 +290,7 @@ function createCharacter(char, x, y, fontSize) {
 
 
             /*
-             * 文字が存在するブロックだけ描画
+             * 文字部分の場合だけ着色
              */
             if (alpha > 30) {
 
@@ -264,18 +306,21 @@ function createCharacter(char, x, y, fontSize) {
                     ];
 
 
-                blocks += `
-                    <rect
-                        x="${x + col * cellSize}"
-                        y="${y + row * cellSize}"
-                        width="${cellSize}"
-                        height="${cellSize}"
+                /*
+                 * 1×1pxのブロック
+                 */
+                blocks +=
+                    `<rect
+                        x="${x + col}"
+                        y="${y + row}"
+                        width="1"
+                        height="1"
                         fill="${color}"
-                    />
-                `;
+                    />`;
             }
         }
     }
+
 
     return blocks;
 }
@@ -313,12 +358,16 @@ function generateSVG() {
 
 
     /*
-     * SVG全体のサイズ
+     * SVG全体の幅
      */
     const width =
         chars.length *
         (FONT_SIZE + LETTER_SPACING);
 
+
+    /*
+     * SVG全体の高さ
+     */
     const height =
         FONT_SIZE;
 
@@ -336,6 +385,7 @@ function generateSVG() {
                 index *
                 (FONT_SIZE + LETTER_SPACING);
 
+
             const y = 0;
 
 
@@ -343,18 +393,17 @@ function generateSVG() {
                 createCharacter(
                     char,
                     x,
-                    y,
-                    FONT_SIZE
+                    y
                 );
         }
     );
 
 
     /*
-     * 背景なしのSVG
+     * 背景なしSVG
      *
-     * backgroundやrectを置かないため
-     * 完全透過
+     * backgroundや背景rectを
+     * 一切入れないため完全透過
      */
     currentSVG = `
 <svg
@@ -363,7 +412,7 @@ function generateSVG() {
     height="${height}"
     viewBox="0 0 ${width} ${height}"
 >
-    ${content}
+${content}
 </svg>
 `.trim();
 
@@ -373,7 +422,8 @@ function generateSVG() {
      */
     document.getElementById(
         "preview"
-    ).innerHTML = currentSVG;
+    ).innerHTML =
+        currentSVG;
 }
 
 
@@ -384,7 +434,7 @@ function generateSVG() {
 function downloadSVG() {
 
     /*
-     * まだ生成されていなければ生成
+     * 未生成なら生成
      */
     if (!currentSVG) {
 
@@ -407,14 +457,19 @@ function downloadSVG() {
 
 
     const url =
-        URL.createObjectURL(blob);
+        URL.createObjectURL(
+            blob
+        );
 
 
     const a =
-        document.createElement("a");
+        document.createElement(
+            "a"
+        );
 
 
-    a.href = url;
+    a.href =
+        url;
 
     a.download =
         "block-text.svg";
@@ -438,7 +493,7 @@ function downloadSVG() {
 function downloadPNG() {
 
     /*
-     * SVGがなければ生成
+     * 未生成なら生成
      */
     if (!currentSVG) {
 
@@ -451,7 +506,7 @@ function downloadPNG() {
 
 
     /*
-     * SVG文字列をBlob化
+     * SVGをBlob化
      */
     const svgBlob =
         new Blob(
@@ -464,7 +519,7 @@ function downloadPNG() {
 
 
     /*
-     * Blob URL
+     * SVGのURL
      */
     const svgURL =
         URL.createObjectURL(
@@ -479,147 +534,145 @@ function downloadPNG() {
         new Image();
 
 
-    img.onload = function () {
+    img.onload =
+        function () {
 
-        /*
-         * SVGのサイズを取得
-         */
-        const width =
-            img.naturalWidth;
+            /*
+             * PNG用Canvas
+             */
+            const canvas =
+                document.createElement(
+                    "canvas"
+                );
 
-        const height =
-            img.naturalHeight;
+
+            canvas.width =
+                img.naturalWidth;
+
+            canvas.height =
+                img.naturalHeight;
 
 
-        /*
-         * PNG化用Canvas
-         */
-        const canvas =
-            document.createElement(
-                "canvas"
+            const ctx =
+                canvas.getContext(
+                    "2d"
+                );
+
+
+            /*
+             * Canvasは初期状態が透明。
+             *
+             * 背景を描画しない。
+             */
+            ctx.clearRect(
+                0,
+                0,
+                canvas.width,
+                canvas.height
             );
 
 
-        canvas.width =
-            width;
-
-        canvas.height =
-            height;
-
-
-        const ctx =
-            canvas.getContext("2d");
-
-
-        /*
-         * Canvasは初期状態が透明。
-         *
-         * 背景色を描画しないことで
-         * PNGの背景も透明になる。
-         */
-        ctx.clearRect(
-            0,
-            0,
-            width,
-            height
-        );
+            /*
+             * SVGをCanvasへ描画
+             */
+            ctx.drawImage(
+                img,
+                0,
+                0
+            );
 
 
-        /*
-         * SVGをCanvasへ描画
-         */
-        ctx.drawImage(
-            img,
-            0,
-            0
-        );
+            /*
+             * PNG化
+             */
+            canvas.toBlob(
+                function (blob) {
+
+                    if (!blob) {
+
+                        alert(
+                            "PNGの生成に失敗しました。"
+                        );
+
+                        return;
+                    }
 
 
-        /*
-         * PNGとして出力
-         */
-        canvas.toBlob(
-            function (blob) {
+                    /*
+                     * PNG URL
+                     */
+                    const pngURL =
+                        URL.createObjectURL(
+                            blob
+                        );
 
-                if (!blob) {
 
-                    alert(
-                        "PNGの生成に失敗しました。"
+                    /*
+                     * ダウンロード
+                     */
+                    const a =
+                        document.createElement(
+                            "a"
+                        );
+
+
+                    a.href =
+                        pngURL;
+
+                    a.download =
+                        "block-text.png";
+
+
+                    document.body.appendChild(
+                        a
                     );
 
-                    return;
-                }
+                    a.click();
 
-
-                /*
-                 * PNGのBlob URL
-                 */
-                const pngURL =
-                    URL.createObjectURL(
-                        blob
-                    );
-
-
-                /*
-                 * ダウンロード
-                 */
-                const a =
-                    document.createElement(
-                        "a"
+                    document.body.removeChild(
+                        a
                     );
 
 
-                a.href =
-                    pngURL;
+                    /*
+                     * URL解放
+                     */
+                    URL.revokeObjectURL(
+                        pngURL
+                    );
 
-                a.download =
-                    "block-text.png";
-
-
-                document.body.appendChild(a);
-
-                a.click();
-
-                document.body.removeChild(a);
+                },
+                "image/png"
+            );
 
 
-                /*
-                 * URL解放
-                 */
-                URL.revokeObjectURL(
-                    pngURL
-                );
-
-            },
-            "image/png"
-        );
+            /*
+             * SVG URL解放
+             */
+            URL.revokeObjectURL(
+                svgURL
+            );
+        };
 
 
-        /*
-         * SVG URL解放
-         */
-        URL.revokeObjectURL(
-            svgURL
-        );
-    };
+    img.onerror =
+        function () {
 
+            URL.revokeObjectURL(
+                svgURL
+            );
 
-    img.onerror = function () {
-
-        URL.revokeObjectURL(
-            svgURL
-        );
-
-        alert(
-            "SVGのPNG変換に失敗しました。"
-        );
-    };
+            alert(
+                "PNGへの変換に失敗しました。"
+            );
+        };
 
 
     /*
-     * SVGをImageとして読み込む
+     * SVGを読み込む
      */
-    img.src = svgURL;
+    img.src =
+        svgURL;
 }
 
 </script>
