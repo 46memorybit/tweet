@@ -109,9 +109,9 @@ button:hover {
     <h1>100×100 ブロック文字 Generator</h1>
     <div class="description">
         1文字を100×100＝10,000ブロックに分割します。<br>
-        文字部分の全ブロックに #323639 / #cfd9de / #ffffff / #000000 の4色をランダムで割り当て、<br>
+        文字部分・背景部分を問わず、全ブロックに #323639 / #cfd9de / #ffffff / #000000 の4色をランダムで割り当て、<br>
         各ブロックを独立に50%の確率で透明化します。<br>
-        背景は完全透明です。改行も反映されます。
+        改行も反映されます。
     </div>
     <textarea
         id="textInput"
@@ -216,7 +216,9 @@ function getRandomColor() {
 ========================================= */
 function createCharacter(char, x, y) {
     /*
-     * 文字判定用Canvas
+     * 文字判定用Canvas（現在は形状判定に未使用だが、
+     * 将来の拡張のために残しています）
+     * 今回は文字・背景を区別せず全ブロックを同様に処理
      */
     const canvas =
         document.createElement("canvas");
@@ -226,18 +228,12 @@ function createCharacter(char, x, y) {
         FONT_SIZE;
     canvas.height =
         FONT_SIZE;
-    /*
-     * Canvasを完全透明にする
-     */
     ctx.clearRect(
         0,
         0,
         FONT_SIZE,
         FONT_SIZE
     );
-    /*
-     * 文字を描画
-     */
     ctx.font =
         `bold ${FONT_SIZE}px sans-serif`;
     ctx.textAlign =
@@ -252,23 +248,11 @@ function createCharacter(char, x, y) {
         FONT_SIZE / 2
     );
     /*
-     * 文字のピクセル情報を取得
-     */
-    const imageData =
-        ctx.getImageData(
-            0,
-            0,
-            FONT_SIZE,
-            FONT_SIZE
-        );
-    const data =
-        imageData.data;
-    /*
-     * 文字部分のSVG
+     * SVGコンテンツ
      */
     let svgContent = "";
     /*
-     * 全ブロックを走査
+     * 全ブロック（文字部分・背景部分問わず）を走査
      */
     for (
         let row = 0;
@@ -281,42 +265,26 @@ function createCharacter(char, x, y) {
             col++
         ) {
             /*
-             * RGBA配列の位置
+             * 4色をランダム割り当て
              */
-            const index =
-                (row * FONT_SIZE + col) * 4;
+            const assignedColor =
+                getRandomColor();
             /*
-             * 文字の透明度
+             * 50%の確率で透明化
+             * （残りの50%だけ描画）
              */
-            const alpha =
-                data[index + 3];
-            /*
-             * 文字部分のみ処理
-             * （背景は完全透明のまま）
-             */
-            if (alpha > 30) {
-                /*
-                 * 4色をランダム割り当て
-                 */
-                const assignedColor =
-                    getRandomColor();
-                /*
-                 * 50%の確率で透明化
-                 * （残りの50%だけ描画）
-                 */
-                if (
-                    Math.random() >=
-                    TRANSPARENCY_RATE
-                ) {
-                    svgContent +=
-                        `<rect
-                            x="${x + col}"
-                            y="${y + row}"
-                            width="1"
-                            height="1"
-                            fill="${assignedColor}"
-                        />`;
-                }
+            if (
+                Math.random() >=
+                TRANSPARENCY_RATE
+            ) {
+                svgContent +=
+                    `<rect
+                        x="${x + col}"
+                        y="${y + row}"
+                        width="1"
+                        height="1"
+                        fill="${assignedColor}"
+                    />`;
             }
         }
     }
@@ -419,8 +387,7 @@ function generateSVG() {
     );
     /*
      * SVG生成
-     * 背景要素は配置しないため、
-     * 描画されていない部分は完全透明。
+     * 描画されていない部分は完全透明
      */
     currentSVG = `
 <svg
@@ -456,7 +423,7 @@ ${content}
         </strong>
         （固定）
         <br>
-        文字部分の各ブロックに4色をランダム割り当て後、<br>
+        文字部分・背景部分を問わず、全ブロックに4色をランダム割り当て後、<br>
         独立に50%の確率で透明化しています。
         <br>
         行数：
