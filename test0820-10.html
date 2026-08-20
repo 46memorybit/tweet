@@ -73,9 +73,6 @@ button:hover {
     overflow-x: auto;
     border-radius: 8px;
 
-    /*
-     * 透過部分確認用チェッカーボード
-     */
     background:
         linear-gradient(45deg, #ddd 25%, transparent 25%),
         linear-gradient(-45deg, #ddd 25%, transparent 25%),
@@ -95,6 +92,14 @@ button:hover {
     display: block;
     width: 100%;
     height: auto;
+}
+
+.stats {
+    margin-top: 15px;
+    padding: 12px 16px;
+    background: #fff;
+    border-radius: 6px;
+    line-height: 1.7;
 }
 
 .legend {
@@ -127,10 +132,10 @@ button:hover {
     <h1>100×100 ブロック文字 Generator</h1>
 
     <div class="description">
-        1文字を100×100＝10,000ブロックに分割し、<br>
-        全ブロックに4色をランダムで割り当てます。<br>
-        文字部分は、割り当てられた色が#000000の場合のみ表示し、
-        それ以外は透明になります。
+        1文字を100×100＝10,000ブロックに分割します。<br>
+        全ブロックに4色をランダムで割り当て、文字部分では#000000以外を透明化します。<br>
+        その後、文字部分で透明化された実際の割合を計算し、
+        背景部分も同じ確率で透明化します。
     </div>
 
     <textarea
@@ -155,6 +160,8 @@ button:hover {
     </div>
 
     <div id="preview"></div>
+
+    <div id="stats" class="stats" style="display:none;"></div>
 
     <div class="legend">
 
@@ -212,7 +219,7 @@ const GRID_SIZE = 100;
 
 
 /*
- * 1文字の画像サイズ
+ * 1文字のサイズ
  *
  * 100px × 100px
  *
@@ -228,10 +235,7 @@ const LETTER_SPACING = 10;
 
 
 /*
- * 全ブロックに割り当てる4色
- *
- * すべてのブロックが
- * この4色のいずれかになる
+ * 全ブロックにランダムで割り当てる4色
  */
 const COLORS = [
     "#323639",
@@ -245,6 +249,15 @@ const COLORS = [
  * 現在生成されているSVG
  */
 let currentSVG = null;
+
+
+/*
+ * 透明化率
+ *
+ * 文字部分の処理によって
+ * 動的に決定する
+ */
+let transparencyRate = 0;
 
 
 /* =========================================
@@ -263,13 +276,13 @@ function getRandomColor() {
 
 
 /* =========================================
-   1文字を100×100ブロックに変換
+   1文字を処理
 ========================================= */
 
 function createCharacter(char, x, y) {
 
     /*
-     * 文字の形を判定するためのCanvas
+     * 文字判定用Canvas
      */
     const canvas =
         document.createElement("canvas");
@@ -286,7 +299,7 @@ function createCharacter(char, x, y) {
 
 
     /*
-     * 背景を完全透明にする
+     * Canvasを完全透明にする
      */
     ctx.clearRect(
         0,
@@ -336,15 +349,41 @@ function createCharacter(char, x, y) {
 
 
     /*
-     * SVGのブロック
+     * 文字部分のブロック数
      */
-    let blocks = "";
+    let textBlockCount = 0;
 
 
     /*
-     * 100 × 100
+     * 文字部分で透明になったブロック数
      *
-     * 合計10,000ブロック
+     * #000000以外が割り当てられたブロック
+     */
+    let textTransparentCount = 0;
+
+
+    /*
+     * 背景部分のブロック情報を一時保存
+     *
+     * 透明化率が文字部分から確定してから
+     * 背景を処理するため。
+     */
+    const backgroundBlocks = [];
+
+
+    /*
+     * 文字部分のSVG
+     */
+    let textSVG = "";
+
+
+    /*
+     * =========================================
+     * 第1段階
+     *
+     * 全ブロックに4色を割り当て、
+     * 文字部分の透明化率を計算する
+     * =========================================
      */
     for (
         let row = 0;
@@ -366,7 +405,7 @@ function createCharacter(char, x, y) {
 
 
             /*
-             * Canvas上のRGBA位置
+             * RGBA配列の位置
              */
             const index =
                 (py * FONT_SIZE + px) * 4;
@@ -380,36 +419,37 @@ function createCharacter(char, x, y) {
 
 
             /*
-             * =================================
              * 全ブロックに4色をランダム割り当て
-             * =================================
              */
             const assignedColor =
                 getRandomColor();
 
 
             /*
-             * =================================
              * 文字部分
-             * =================================
-             *
-             * 文字部分は、
-             * 割り当てられた色が
-             * #000000の場合のみ表示。
-             *
-             * #323639
-             * #cfd9de
-             * #ffffff
-             *
-             * の場合は透明にする。
              */
             if (alpha > 30) {
 
+                textBlockCount++;
+
+
+                /*
+                 * #000000以外なら透明
+                 */
                 if (
-                    assignedColor === "#000000"
+                    assignedColor !== "#000000"
                 ) {
 
-                    blocks +=
+                    textTransparentCount++;
+
+                }
+
+                /*
+                 * #000000なら表示
+                 */
+                else {
+
+                    textSVG +=
                         `<rect
                             x="${x + col}"
                             y="${y + row}"
@@ -417,36 +457,114 @@ function createCharacter(char, x, y) {
                             height="1"
                             fill="#000000"
                         />`;
+
                 }
 
             }
 
 
             /*
-             * =================================
              * 背景部分
-             * =================================
-             *
-             * 背景部分は、
-             * 4色すべてをそのまま表示する。
              */
             else {
 
-                blocks +=
-                    `<rect
-                        x="${x + col}"
-                        y="${y + row}"
-                        width="1"
-                        height="1"
-                        fill="${assignedColor}"
-                    />`;
-            }
+                backgroundBlocks.push({
+                    col: col,
+                    row: row,
+                    color: assignedColor
+                });
 
+            }
         }
     }
 
 
-    return blocks;
+    /*
+     * =========================================
+     * 文字部分の実際の透明化率を計算
+     * =========================================
+     *
+     * 例：
+     *
+     * 文字ブロックが1000個
+     * そのうち750個が#000000以外
+     *
+     * transparencyRate = 0.75
+     *
+     * → 背景も75%の確率で透明化
+     */
+    if (textBlockCount > 0) {
+
+        transparencyRate =
+            textTransparentCount /
+            textBlockCount;
+
+    }
+    else {
+
+        transparencyRate = 0;
+
+    }
+
+
+    /*
+     * =========================================
+     * 第2段階
+     *
+     * 背景ブロックを処理
+     *
+     * 文字部分と同じ透明化率を使用
+     * =========================================
+     */
+
+    let backgroundSVG = "";
+
+
+    backgroundBlocks.forEach(
+        block => {
+
+            /*
+             * 文字部分と同じ確率で
+             * 背景ブロックを透明化
+             */
+            const makeTransparent =
+                Math.random() <
+                transparencyRate;
+
+
+            /*
+             * 透明化しない場合
+             * → 割り当てられた4色をそのまま表示
+             */
+            if (!makeTransparent) {
+
+                backgroundSVG +=
+                    `<rect
+                        x="${x + block.col}"
+                        y="${y + block.row}"
+                        width="1"
+                        height="1"
+                        fill="${block.color}"
+                    />`;
+
+            }
+
+            /*
+             * 透明化する場合
+             * → 何も描画しない
+             */
+
+        }
+    );
+
+
+    /*
+     * 文字部分 + 背景部分
+     */
+    return (
+        backgroundSVG +
+        textSVG
+    );
 }
 
 
@@ -516,7 +634,7 @@ function generateSVG() {
 
 
     /*
-     * すべての文字を処理
+     * 全文字を処理
      */
     chars.forEach(
         (char, index) => {
@@ -524,6 +642,7 @@ function generateSVG() {
             const x =
                 index *
                 (FONT_SIZE + LETTER_SPACING);
+
 
             const y = 0;
 
@@ -542,7 +661,7 @@ function generateSVG() {
     /*
      * SVG生成
      *
-     * 背景要素は一切配置しないため、
+     * 背景要素は配置しないため、
      * 描画されていない部分は完全透明。
      */
     currentSVG = `
@@ -564,6 +683,34 @@ ${content}
         "preview"
     ).innerHTML =
         currentSVG;
+
+
+    /*
+     * 透明化率表示
+     */
+    const stats =
+        document.getElementById(
+            "stats"
+        );
+
+
+    stats.style.display =
+        "block";
+
+
+    stats.innerHTML =
+        `
+        文字ブロックの透明化率：
+        <strong>
+            ${(transparencyRate * 100).toFixed(2)}%
+        </strong>
+        <br>
+        背景ブロックも同じ
+        <strong>
+            ${(transparencyRate * 100).toFixed(2)}%
+        </strong>
+        の確率で透明化しています。
+        `;
 }
 
 
@@ -603,14 +750,18 @@ function downloadSVG() {
      * Blob URL
      */
     const url =
-        URL.createObjectURL(blob);
+        URL.createObjectURL(
+            blob
+        );
 
 
     /*
-     * ダウンロード
+     * ダウンロードリンク
      */
     const a =
-        document.createElement("a");
+        document.createElement(
+            "a"
+        );
 
 
     a.href =
@@ -630,7 +781,9 @@ function downloadSVG() {
     /*
      * URL解放
      */
-    URL.revokeObjectURL(url);
+    URL.revokeObjectURL(
+        url
+    );
 }
 
 
@@ -714,7 +867,9 @@ function downloadPNG() {
 
 
             /*
-             * Canvas背景は透明のまま
+             * 背景を描画しない
+             *
+             * → PNGも透明部分を保持
              */
             ctx.clearRect(
                 0,
@@ -725,7 +880,7 @@ function downloadPNG() {
 
 
             /*
-             * SVGを描画
+             * SVGをCanvasへ描画
              */
             ctx.drawImage(
                 img,
@@ -760,7 +915,7 @@ function downloadPNG() {
 
 
                     /*
-                     * ダウンロードリンク
+                     * ダウンロード
                      */
                     const a =
                         document.createElement(
@@ -832,7 +987,7 @@ function downloadPNG() {
 
 
 /* =========================================
-   Enterではなくボタンで生成
+   Ctrl + Enterで生成
 ========================================= */
 
 document
@@ -841,9 +996,6 @@ document
         "keydown",
         function(event) {
 
-            /*
-             * Ctrl + Enterで生成
-             */
             if (
                 event.ctrlKey &&
                 event.key === "Enter"
