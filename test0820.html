@@ -1,0 +1,338 @@
+```html
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>10×10 ブロック文字 SVG Generator</title>
+
+<style>
+    * {
+        box-sizing: border-box;
+    }
+
+    body {
+        margin: 0;
+        padding: 30px;
+        font-family: sans-serif;
+        background: #eeeeee;
+        color: #222;
+    }
+
+    .container {
+        max-width: 900px;
+        margin: 0 auto;
+    }
+
+    h1 {
+        font-size: 24px;
+        margin-bottom: 20px;
+    }
+
+    textarea {
+        width: 100%;
+        height: 120px;
+        padding: 12px;
+        font-size: 20px;
+        resize: vertical;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+    }
+
+    button {
+        margin-top: 12px;
+        padding: 10px 20px;
+        border: none;
+        border-radius: 6px;
+        background: #323639;
+        color: #fff;
+        font-size: 16px;
+        cursor: pointer;
+    }
+
+    button:hover {
+        opacity: 0.85;
+    }
+
+    #preview {
+        margin-top: 30px;
+        padding: 30px;
+        background:
+            linear-gradient(45deg, #ddd 25%, transparent 25%),
+            linear-gradient(-45deg, #ddd 25%, transparent 25%),
+            linear-gradient(45deg, transparent 75%, #ddd 75%),
+            linear-gradient(-45deg, transparent 75%, #ddd 75%);
+        background-size: 20px 20px;
+        background-position: 0 0, 0 10px, 10px -10px, -10px 0;
+        border-radius: 8px;
+        overflow-x: auto;
+    }
+
+    #preview svg {
+        display: block;
+        width: 100%;
+        height: auto;
+    }
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <h1>10×10 ブロック文字 SVG Generator</h1>
+
+    <textarea id="textInput" placeholder="文字を入力してください"></textarea>
+
+    <br>
+
+    <button onclick="generateSVG()">生成</button>
+    <button onclick="downloadSVG()">SVGをダウンロード</button>
+
+    <div id="preview"></div>
+
+</div>
+
+<script>
+
+const COLORS = [
+    "#323639",
+    "#cfd9de",
+    "#ffffff"
+];
+
+let currentSVG = null;
+
+
+/*
+ * 1文字を10×10の100ブロックに分割する
+ *
+ * 各ブロックについて、
+ * そのブロックが文字の形の内側なら
+ * ランダムな色を設定。
+ *
+ * 文字の外側は透明。
+ */
+function createCharacter(char, x, y, fontSize) {
+
+    const cellSize = fontSize / 10;
+
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+
+    const size = fontSize;
+
+    canvas.width = size;
+    canvas.height = size;
+
+    ctx.clearRect(0, 0, size, size);
+
+    /*
+     * SVGと同じような太さになるように
+     * 太めのフォントを使用
+     */
+    ctx.font = `bold ${fontSize}px sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+
+    ctx.fillStyle = "#000000";
+
+    ctx.fillText(
+        char,
+        size / 2,
+        size / 2
+    );
+
+    /*
+     * 文字のピクセル情報を取得
+     */
+    const imageData = ctx.getImageData(
+        0,
+        0,
+        size,
+        size
+    );
+
+    const data = imageData.data;
+
+    let blocks = "";
+
+    /*
+     * 10×10 = 100ブロック
+     */
+    for (let row = 0; row < 10; row++) {
+
+        for (let col = 0; col < 10; col++) {
+
+            /*
+             * 各ブロックの中心座標
+             */
+            const px = Math.floor(
+                (col + 0.5) * cellSize
+            );
+
+            const py = Math.floor(
+                (row + 0.5) * cellSize
+            );
+
+            const index =
+                (py * size + px) * 4;
+
+            const alpha = data[index + 3];
+
+            /*
+             * 文字の内側なら色を付ける
+             */
+            if (alpha > 30) {
+
+                /*
+                 * ランダムで3色から選択
+                 */
+                const color =
+                    COLORS[
+                        Math.floor(
+                            Math.random() * COLORS.length
+                        )
+                    ];
+
+                blocks += `
+                    <rect
+                        x="${x + col * cellSize}"
+                        y="${y + row * cellSize}"
+                        width="${cellSize}"
+                        height="${cellSize}"
+                        fill="${color}"
+                    />
+                `;
+            }
+        }
+    }
+
+    return blocks;
+}
+
+
+/*
+ * SVG生成
+ */
+function generateSVG() {
+
+    const text =
+        document.getElementById("textInput").value;
+
+    if (!text) {
+        alert("文字を入力してください。");
+        return;
+    }
+
+    /*
+     * 改行を除去
+     */
+    const chars =
+        [...text].filter(char => char !== "\n");
+
+    /*
+     * 1文字のサイズ
+     */
+    const fontSize = 100;
+
+    /*
+     * 文字間
+     */
+    const spacing = 10;
+
+    /*
+     * 全体幅
+     */
+    const width =
+        chars.length * (fontSize + spacing);
+
+    const height = fontSize;
+
+    let content = "";
+
+    /*
+     * すべての文字を処理
+     */
+    chars.forEach((char, index) => {
+
+        const x =
+            index * (fontSize + spacing);
+
+        const y = 0;
+
+        content += createCharacter(
+            char,
+            x,
+            y,
+            fontSize
+        );
+    });
+
+
+    /*
+     * 背景を持たないSVG
+     */
+    currentSVG = `
+<svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="${width}"
+    height="${height}"
+    viewBox="0 0 ${width} ${height}"
+>
+    ${content}
+</svg>
+    `.trim();
+
+
+    /*
+     * プレビュー表示
+     */
+    document.getElementById("preview").innerHTML =
+        currentSVG;
+}
+
+
+/*
+ * SVGファイルとしてダウンロード
+ */
+function downloadSVG() {
+
+    if (!currentSVG) {
+        generateSVG();
+
+        if (!currentSVG) {
+            return;
+        }
+    }
+
+    const blob = new Blob(
+        [currentSVG],
+        {
+            type: "image/svg+xml;charset=utf-8"
+        }
+    );
+
+    const url =
+        URL.createObjectURL(blob);
+
+    const a =
+        document.createElement("a");
+
+    a.href = url;
+    a.download = "block-text.svg";
+
+    document.body.appendChild(a);
+
+    a.click();
+
+    document.body.removeChild(a);
+
+    URL.revokeObjectURL(url);
+}
+
+</script>
+
+</body>
+</html>
+```
