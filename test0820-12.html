@@ -109,10 +109,9 @@ button:hover {
     <h1>100×100 ブロック文字 Generator</h1>
     <div class="description">
         1文字を100×100＝10,000ブロックに分割します。<br>
-        全ブロックに4色をランダムで割り当て、文字部分では#000000以外を透明化します。<br>
-        その後、文字部分で透明化された実際の割合を計算し、
-        背景部分も同じ確率で透明化します。<br>
-        改行も反映されます。
+        文字部分の全ブロックに #323639 / #cfd9de / #ffffff / #000000 の4色をランダムで割り当て、<br>
+        各ブロックを独立に50%の確率で透明化します。<br>
+        背景は完全透明です。改行も反映されます。
     </div>
     <textarea
         id="textInput"
@@ -168,16 +167,12 @@ button:hover {
 ========================================= */
 /*
  * 1文字のグリッドサイズ
- *
- * 100 × 100
- * = 10,000ブロック
+ * 100 × 100 = 10,000ブロック
  */
 const GRID_SIZE = 100;
 /*
  * 1文字のサイズ
- *
  * 100px × 100px
- *
  * 1ブロック = 1px × 1px
  */
 const FONT_SIZE = 100;
@@ -199,16 +194,13 @@ const COLORS = [
     "#000000"
 ];
 /*
+ * 透明化確率（固定50%）
+ */
+const TRANSPARENCY_RATE = 0.5;
+/*
  * 現在生成されているSVG
  */
 let currentSVG = null;
-/*
- * 透明化率
- *
- * 文字部分の処理によって
- * 動的に決定する
- */
-let transparencyRate = 0;
 /* =========================================
    ランダムな色を取得
 ========================================= */
@@ -272,33 +264,11 @@ function createCharacter(char, x, y) {
     const data =
         imageData.data;
     /*
-     * 文字部分のブロック数
-     */
-    let textBlockCount = 0;
-    /*
-     * 文字部分で透明になったブロック数
-     *
-     * #000000以外が割り当てられたブロック
-     */
-    let textTransparentCount = 0;
-    /*
-     * 背景部分のブロック情報を一時保存
-     *
-     * 透明化率が文字部分から確定してから
-     * 背景を処理するため。
-     */
-    const backgroundBlocks = [];
-    /*
      * 文字部分のSVG
      */
-    let textSVG = "";
+    let svgContent = "";
     /*
-     * =========================================
-     * 第1段階
-     *
-     * 全ブロックに4色を割り当て、
-     * 文字部分の透明化率を計算する
-     * =========================================
+     * 全ブロックを走査
      */
     for (
         let row = 0;
@@ -311,132 +281,46 @@ function createCharacter(char, x, y) {
             col++
         ) {
             /*
-             * 1ブロック = 1px
-             */
-            const px = col;
-            const py = row;
-            /*
              * RGBA配列の位置
              */
             const index =
-                (py * FONT_SIZE + px) * 4;
+                (row * FONT_SIZE + col) * 4;
             /*
              * 文字の透明度
              */
             const alpha =
                 data[index + 3];
             /*
-             * 全ブロックに4色をランダム割り当て
-             */
-            const assignedColor =
-                getRandomColor();
-            /*
-             * 文字部分
+             * 文字部分のみ処理
+             * （背景は完全透明のまま）
              */
             if (alpha > 30) {
-                textBlockCount++;
                 /*
-                 * #000000以外なら透明
+                 * 4色をランダム割り当て
+                 */
+                const assignedColor =
+                    getRandomColor();
+                /*
+                 * 50%の確率で透明化
+                 * （残りの50%だけ描画）
                  */
                 if (
-                    assignedColor !== "#000000"
+                    Math.random() >=
+                    TRANSPARENCY_RATE
                 ) {
-                    textTransparentCount++;
-                }
-                /*
-                 * #000000なら表示
-                 */
-                else {
-                    textSVG +=
+                    svgContent +=
                         `<rect
                             x="${x + col}"
                             y="${y + row}"
                             width="1"
                             height="1"
-                            fill="#000000"
+                            fill="${assignedColor}"
                         />`;
                 }
             }
-            /*
-             * 背景部分
-             */
-            else {
-                backgroundBlocks.push({
-                    col: col,
-                    row: row,
-                    color: assignedColor
-                });
-            }
         }
     }
-    /*
-     * =========================================
-     * 文字部分の実際の透明化率を計算
-     * =========================================
-     *
-     * 例：
-     *
-     * 文字ブロックが1000個
-     * そのうち750個が#000000以外
-     *
-     * transparencyRate = 0.75
-     *
-     * → 背景も75%の確率で透明化
-     */
-    if (textBlockCount > 0) {
-        transparencyRate =
-            textTransparentCount /
-            textBlockCount;
-    }
-    else {
-        transparencyRate = 0;
-    }
-    /*
-     * =========================================
-     * 第2段階
-     *
-     * 背景ブロックを処理
-     *
-     * 文字部分と同じ透明化率を使用
-     * =========================================
-     */
-    let backgroundSVG = "";
-    backgroundBlocks.forEach(
-        block => {
-            /*
-             * 文字部分と同じ確率で
-             * 背景ブロックを透明化
-             */
-            const makeTransparent =
-                Math.random() <
-                transparencyRate;
-            /*
-             * 透明化しない場合
-             * → 割り当てられた4色をそのまま表示
-             */
-            if (!makeTransparent) {
-                backgroundSVG +=
-                    `<rect
-                        x="${x + block.col}"
-                        y="${y + block.row}"
-                        width="1"
-                        height="1"
-                        fill="${block.color}"
-                    />`;
-            }
-            /*
-             * 透明化する場合
-             * → 何も描画しない
-             */
-        }
-    );
-    /*
-     * 文字部分 + 背景部分
-     */
-    return (
-        backgroundSVG +
-        textSVG
-    );
+    return svgContent;
 }
 /* =========================================
    SVG生成
@@ -457,7 +341,6 @@ function generateSVG() {
     }
     /*
      * 改行で分割して行配列を作成
-     * （末尾の空行は無視、途中の空行は保持）
      */
     const lines = text
         .replace(/\r\n/g, "\n")
@@ -536,7 +419,6 @@ function generateSVG() {
     );
     /*
      * SVG生成
-     *
      * 背景要素は配置しないため、
      * 描画されていない部分は完全透明。
      */
@@ -558,8 +440,7 @@ ${content}
     ).innerHTML =
         currentSVG;
     /*
-     * 透明化率表示
-     * （最後に処理した文字の透明化率を表示）
+     * 統計表示
      */
     const stats =
         document.getElementById(
@@ -569,16 +450,14 @@ ${content}
         "block";
     stats.innerHTML =
         `
-        文字ブロックの透明化率：
+        透明化率：
         <strong>
-            ${(transparencyRate * 100).toFixed(2)}%
+            ${(TRANSPARENCY_RATE * 100).toFixed(0)}%
         </strong>
+        （固定）
         <br>
-        背景ブロックも同じ
-        <strong>
-            ${(transparencyRate * 100).toFixed(2)}%
-        </strong>
-        の確率で透明化しています。
+        文字部分の各ブロックに4色をランダム割り当て後、<br>
+        独立に50%の確率で透明化しています。
         <br>
         行数：
         <strong>
@@ -594,18 +473,12 @@ ${content}
    SVGダウンロード
 ========================================= */
 function downloadSVG() {
-    /*
-     * 未生成なら生成
-     */
     if (!currentSVG) {
         generateSVG();
         if (!currentSVG) {
             return;
         }
     }
-    /*
-     * SVG Blob
-     */
     const blob =
         new Blob(
             [currentSVG],
@@ -614,16 +487,10 @@ function downloadSVG() {
                     "image/svg+xml;charset=utf-8"
             }
         );
-    /*
-     * Blob URL
-     */
     const url =
         URL.createObjectURL(
             blob
         );
-    /*
-     * ダウンロードリンク
-     */
     const a =
         document.createElement(
             "a"
@@ -635,9 +502,6 @@ function downloadSVG() {
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    /*
-     * URL解放
-     */
     URL.revokeObjectURL(
         url
     );
@@ -646,18 +510,12 @@ function downloadSVG() {
    透過PNGダウンロード
 ========================================= */
 function downloadPNG() {
-    /*
-     * 未生成なら生成
-     */
     if (!currentSVG) {
         generateSVG();
         if (!currentSVG) {
             return;
         }
     }
-    /*
-     * SVGをBlob化
-     */
     const svgBlob =
         new Blob(
             [currentSVG],
@@ -666,44 +524,28 @@ function downloadPNG() {
                     "image/svg+xml;charset=utf-8"
             }
         );
-    /*
-     * SVG Blob URL
-     */
     const svgURL =
         URL.createObjectURL(
             svgBlob
         );
-    /*
-     * SVGをImageとして読み込む
-     */
     const img =
         new Image();
     img.onload =
         function () {
-            /*
-             * PNG用Canvas
-             */
             const canvas =
                 document.createElement(
                     "canvas"
                 );
-            /*
-             * SVGと同じサイズ
-             */
             canvas.width =
                 img.naturalWidth;
             canvas.height =
                 img.naturalHeight;
-            /*
-             * 2Dコンテキスト
-             */
             const ctx =
                 canvas.getContext(
                     "2d"
                 );
             /*
              * 背景を描画しない
-             *
              * → PNGも透明部分を保持
              */
             ctx.clearRect(
@@ -712,17 +554,11 @@ function downloadPNG() {
                 canvas.width,
                 canvas.height
             );
-            /*
-             * SVGをCanvasへ描画
-             */
             ctx.drawImage(
                 img,
                 0,
                 0
             );
-            /*
-             * PNGへ変換
-             */
             canvas.toBlob(
                 function (blob) {
                     if (!blob) {
@@ -731,16 +567,10 @@ function downloadPNG() {
                         );
                         return;
                     }
-                    /*
-                     * PNG Blob URL
-                     */
                     const pngURL =
                         URL.createObjectURL(
                             blob
                         );
-                    /*
-                     * ダウンロード
-                     */
                     const a =
                         document.createElement(
                             "a"
@@ -756,25 +586,16 @@ function downloadPNG() {
                     document.body.removeChild(
                         a
                     );
-                    /*
-                     * URL解放
-                     */
                     URL.revokeObjectURL(
                         pngURL
                     );
                 },
                 "image/png"
             );
-            /*
-             * SVG URL解放
-             */
             URL.revokeObjectURL(
                 svgURL
             );
         };
-    /*
-     * SVG読み込みエラー
-     */
     img.onerror =
         function () {
             URL.revokeObjectURL(
@@ -784,9 +605,6 @@ function downloadPNG() {
                 "PNGへの変換に失敗しました。"
             );
         };
-    /*
-     * SVGを読み込む
-     */
     img.src =
         svgURL;
 }
