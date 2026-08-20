@@ -109,8 +109,10 @@ button:hover {
     <h1>100×100 ブロック文字 Generator</h1>
     <div class="description">
         1文字を100×100＝10,000ブロックに分割します。<br>
-        文字部分：#323639 / #cfd9de / #ffffff / #000000 の4色をランダム割り当て後、50%の確率で透明化。<br>
-        背景部分：#323639 / #cfd9de / #ffffff の3色をランダム割り当て後、50%の確率で透明化。<br>
+        文字部分・背景部分ともに、各ブロックに対して：<br>
+        ・50%の確率で #000000 を割り当て<br>
+        ・残りの50%は #323639 / #cfd9de / #ffffff からランダムに割り当て<br>
+        その後、独立に50%の確率で透明化します。<br>
         改行も反映されます。
     </div>
     <textarea
@@ -157,7 +159,7 @@ button:hover {
                 class="color-box"
                 style="background:#000000;"
             ></div>
-            <span>#000000（文字のみ）</span>
+            <span>#000000（50%）</span>
         </div>
     </div>
 </div>
@@ -185,22 +187,17 @@ const LETTER_SPACING = 10;
  */
 const LINE_SPACING = 20;
 /*
- * 文字部分で使う4色
+ * #000000 以外の3色
  */
-const COLORS_TEXT = [
-    "#323639",
-    "#cfd9de",
-    "#ffffff",
-    "#000000"
-];
-/*
- * 背景部分で使う3色（#000000を除く）
- */
-const COLORS_BG = [
+const COLORS_OTHER = [
     "#323639",
     "#cfd9de",
     "#ffffff"
 ];
+/*
+ * #000000 を割り当てる確率
+ */
+const BLACK_RATE = 0.5;
 /*
  * 透明化確率（固定50%）
  */
@@ -210,12 +207,12 @@ const TRANSPARENCY_RATE = 0.5;
  */
 let currentSVG = null;
 /* =========================================
-   ランダムな色を取得
+   ランダムな色を取得（3色から）
 ========================================= */
-function getRandomColor(colors) {
-    return colors[
+function getRandomOtherColor() {
+    return COLORS_OTHER[
         Math.floor(
-            Math.random() * colors.length
+            Math.random() * COLORS_OTHER.length
         )
     ];
 }
@@ -224,7 +221,7 @@ function getRandomColor(colors) {
 ========================================= */
 function createCharacter(char, x, y) {
     /*
-     * 文字判定用Canvas
+     * 文字判定用Canvas（形状は現在未使用だが拡張用に残置）
      */
     const canvas =
         document.createElement("canvas");
@@ -234,18 +231,12 @@ function createCharacter(char, x, y) {
         FONT_SIZE;
     canvas.height =
         FONT_SIZE;
-    /*
-     * Canvasを完全透明にする
-     */
     ctx.clearRect(
         0,
         0,
         FONT_SIZE,
         FONT_SIZE
     );
-    /*
-     * 文字を描画
-     */
     ctx.font =
         `bold ${FONT_SIZE}px sans-serif`;
     ctx.textAlign =
@@ -260,23 +251,11 @@ function createCharacter(char, x, y) {
         FONT_SIZE / 2
     );
     /*
-     * 文字のピクセル情報を取得
-     */
-    const imageData =
-        ctx.getImageData(
-            0,
-            0,
-            FONT_SIZE,
-            FONT_SIZE
-        );
-    const data =
-        imageData.data;
-    /*
      * SVGコンテンツ
      */
     let svgContent = "";
     /*
-     * 全ブロックを走査
+     * 全ブロック（文字・背景問わず）を走査
      */
     for (
         let row = 0;
@@ -289,34 +268,18 @@ function createCharacter(char, x, y) {
             col++
         ) {
             /*
-             * RGBA配列の位置
-             */
-            const index =
-                (row * FONT_SIZE + col) * 4;
-            /*
-             * 文字の透明度
-             */
-            const alpha =
-                data[index + 3];
-            /*
-             * 文字部分か背景部分かで色の候補を分ける
+             * 色の決定
+             * 50% → #000000
+             * 残り50% → 3色からランダム
              */
             let assignedColor;
-            if (alpha > 30) {
-                /*
-                 * 文字部分：4色
-                 */
-                assignedColor =
-                    getRandomColor(COLORS_TEXT);
+            if (Math.random() < BLACK_RATE) {
+                assignedColor = "#000000";
             } else {
-                /*
-                 * 背景部分：3色（#000000を除く）
-                 */
-                assignedColor =
-                    getRandomColor(COLORS_BG);
+                assignedColor = getRandomOtherColor();
             }
             /*
-             * 50%の確率で透明化
+             * さらに独立して50%の確率で透明化
              * （残りの50%だけ描画）
              */
             if (
@@ -463,14 +426,18 @@ ${content}
         "block";
     stats.innerHTML =
         `
+        #000000 割り当て率：
+        <strong>
+            ${(BLACK_RATE * 100).toFixed(0)}%
+        </strong>
+        <br>
+        残りの50%は #323639 / #cfd9de / #ffffff からランダム
+        <br>
         透明化率：
         <strong>
             ${(TRANSPARENCY_RATE * 100).toFixed(0)}%
         </strong>
-        （固定）
-        <br>
-        文字部分：4色ランダム → 50%透明化<br>
-        背景部分：3色（#000000除く）ランダム → 50%透明化
+        （色決定後に独立して適用）
         <br>
         行数：
         <strong>
