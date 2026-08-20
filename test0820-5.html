@@ -60,7 +60,7 @@ button:hover {
 /*
  * プレビュー
  *
- * 透過部分が分かるように
+ * 透明部分が分かるように
  * チェッカーボードを表示
  */
 #preview {
@@ -129,12 +129,12 @@ button:hover {
 
 
 /* =========================================
-   設定
+   基本設定
 ========================================= */
 
 
 /*
- * 1文字を100×100に分割
+ * 1文字を100 × 100に分割
  *
  * 100 × 100
  * = 10,000ブロック
@@ -153,7 +153,7 @@ const FONT_SIZE = 100;
 
 
 /*
- * 文字同士の間隔
+ * 文字と文字の間隔
  */
 const LETTER_SPACING = 10;
 
@@ -168,16 +168,33 @@ const TEXT_COLORS = [
 ];
 
 
+/* =========================================
+   背景の確率
+========================================= */
+
 /*
- * 背景を黒にする確率
+ * 背景部分は以下の確率
  *
- * 0.5 = 50%
+ * 50% → 白
+ * 25% → 透明
+ * 25% → 黒
  */
-const BACKGROUND_BLACK_PROBABILITY = 0.5;
 
 
 /*
- * 現在のSVG
+ * 白
+ */
+const BACKGROUND_WHITE_PROBABILITY = 0.5;
+
+
+/*
+ * 黒
+ */
+const BACKGROUND_BLACK_PROBABILITY = 0.25;
+
+
+/*
+ * 現在生成されているSVG
  */
 let currentSVG = null;
 
@@ -190,7 +207,7 @@ let currentSVG = null;
 function createCharacter(char, x, y) {
 
     /*
-     * 文字判定用Canvas
+     * 文字の形を判定するCanvas
      */
     const canvas =
         document.createElement("canvas");
@@ -207,7 +224,7 @@ function createCharacter(char, x, y) {
 
 
     /*
-     * 完全透明
+     * Canvasを透明にする
      */
     ctx.clearRect(
         0,
@@ -218,7 +235,7 @@ function createCharacter(char, x, y) {
 
 
     /*
-     * 文字描画
+     * 文字を描画
      */
     ctx.font =
         `bold ${FONT_SIZE}px sans-serif`;
@@ -241,7 +258,7 @@ function createCharacter(char, x, y) {
 
 
     /*
-     * Canvasのピクセル情報
+     * Canvasのピクセル情報を取得
      */
     const imageData =
         ctx.getImageData(
@@ -257,7 +274,7 @@ function createCharacter(char, x, y) {
 
 
     /*
-     * SVGブロック
+     * SVGのブロック
      */
     let blocks = "";
 
@@ -294,7 +311,7 @@ function createCharacter(char, x, y) {
 
 
             /*
-             * 文字部分かどうか
+             * 文字の透明度
              */
             const alpha =
                 data[index + 3];
@@ -308,6 +325,10 @@ function createCharacter(char, x, y) {
 
                 /*
                  * 文字部分は3色からランダム
+                 *
+                 * #323639
+                 * #cfd9de
+                 * #ffffff
                  */
                 const color =
                     TEXT_COLORS[
@@ -337,12 +358,41 @@ function createCharacter(char, x, y) {
             else {
 
                 /*
-                 * 50%の確率で黒
+                 * 0.0 ～ 1.0
+                 */
+                const random =
+                    Math.random();
+
+
+                /*
+                 * 0.00 ～ 0.50
                  *
-                 * Math.random() < 0.5
+                 * → 白
                  */
                 if (
-                    Math.random() <
+                    random <
+                    BACKGROUND_WHITE_PROBABILITY
+                ) {
+
+                    blocks +=
+                        `<rect
+                            x="${x + col}"
+                            y="${y + row}"
+                            width="1"
+                            height="1"
+                            fill="#ffffff"
+                        />`;
+                }
+
+
+                /*
+                 * 0.50 ～ 0.75
+                 *
+                 * → 黒
+                 */
+                else if (
+                    random <
+                    BACKGROUND_WHITE_PROBABILITY +
                     BACKGROUND_BLACK_PROBABILITY
                 ) {
 
@@ -354,13 +404,15 @@ function createCharacter(char, x, y) {
                             height="1"
                             fill="#000000"
                         />`;
-
                 }
 
+
                 /*
-                 * それ以外は何も描画しない
+                 * 0.75 ～ 1.00
                  *
-                 * → 完全透過
+                 * → 透明
+                 *
+                 * 何も描画しない
                  */
             }
         }
@@ -422,7 +474,7 @@ function generateSVG() {
 
 
     /*
-     * 全文字を処理
+     * すべての文字を処理
      */
     chars.forEach(
         (char, index) => {
@@ -430,7 +482,6 @@ function generateSVG() {
             const x =
                 index *
                 (FONT_SIZE + LETTER_SPACING);
-
 
             const y = 0;
 
@@ -448,8 +499,7 @@ function generateSVG() {
     /*
      * 背景なしSVG
      *
-     * 描画されなかった部分は
-     * 完全透過
+     * 透明部分は何も描画されない
      */
     currentSVG = `
 <svg
@@ -481,7 +531,7 @@ ${content}
 function downloadSVG() {
 
     /*
-     * 未生成なら生成
+     * まだ生成されていない場合
      */
     if (!currentSVG) {
 
@@ -541,7 +591,7 @@ function downloadSVG() {
 function downloadPNG() {
 
     /*
-     * 未生成なら生成
+     * まだ生成されていない場合
      */
     if (!currentSVG) {
 
@@ -608,9 +658,10 @@ function downloadPNG() {
 
 
             /*
-             * 背景を描画しない
+             * 背景は描画しない
              *
-             * → 完全透過
+             * → SVG内の透明部分が
+             *    PNGでも透明になる
              */
             ctx.clearRect(
                 0,
@@ -621,7 +672,7 @@ function downloadPNG() {
 
 
             /*
-             * SVGを描画
+             * SVGをCanvasへ描画
              */
             ctx.drawImage(
                 img,
@@ -631,7 +682,7 @@ function downloadPNG() {
 
 
             /*
-             * PNGとして出力
+             * PNGとして書き出す
              */
             canvas.toBlob(
                 function (blob) {
@@ -694,6 +745,9 @@ function downloadPNG() {
             );
 
 
+            /*
+             * SVG URL解放
+             */
             URL.revokeObjectURL(
                 svgURL
             );
@@ -719,7 +773,6 @@ function downloadPNG() {
     img.src =
         svgURL;
 }
-
 
 </script>
 
